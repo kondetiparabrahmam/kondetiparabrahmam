@@ -6,7 +6,7 @@ FROM openjdk:17-jdk-slim
 WORKDIR /app
 
 # Copy the JAR file into the container at /app
-COPY target/uber.jar /app/uber.jar
+COPY target/01-maven-web-app.war
 
 # Expose the port the app runs on
 EXPOSE 9090
