@@ -1,67 +1,94 @@
-To push your Docker image to Docker Hub from your Jenkins pipeline, you can modify the previous pipeline script to include Docker Hub credentials and the push step. Here's an updated version of the pipeline:
 
-groovy
 pipeline {
-    agent any
-
-    environment {
-        // Define environment variables for Docker Hub credentials
-        DOCKER_HUB_CREDENTIALS = credentials('docker-hub') // Jenkins credentials ID for Docker Hub
-        DOCKER_IMAGE_NAME = 'your-docker-hub-username/your-image-name' // Docker Hub username and image name
+  agent any
+  environment {
+        
+        MAVEN_HOME = tool 'Maven 3.2.5'
+        PATH = "${MAVEN_HOME}/bin:${PATH}"
+	DOCKER_IMAGE_NAME = "bannu/01-maven-web-app"
+        DOCKER_IMAGE_TAG = "latest"
+        DOCKER_USERNAME = "kondetipbhm@gmail.com"
+        DOCKER_PASSWORD = "Bannu@123"
+        DOCKER_REGISTRY_URL = "https://index.docker.io/v1/"
+            
     }
 
-    stages {
-        stage('Checkout') {
-            steps {
-                git 'https://github.com/kondetiparabrahmam/kondetiparabrahmam.git'
-            }
-        }
-        
-        stage('Build') {
-            steps {
-                sh 'mvn clean package'
-            }
-        }
+  stages {
+    stage('Checkout') {
+      steps {        
+        cleanWs()
+        checkout scmGit(branches: [[name: '*/main']], extensions: [], userRemoteConfigs: [[url: 'https://github.com/kondetiparabrahmam/kondetiparabrahmam.git']])         
+      }
+    }
 
-        stage('Build Docker Image') {
+    stage('Build') {
+      steps {
+	      
+        script {         
+          sh 'mvn clean install'
+        }
+      }
+    }
+
+    stage('Docker Build') {
+      steps {
+        sh 'docker stop $(docker ps -q) || true'
+        sh 'docker rm -f $(docker ps -a -q) || true'
+        sh 'docker rmi -f $(docker images -q) || true' 
+        sh "docker build -t ${DOCKER_IMAGE_NAME}:${DOCKER_IMAGE_TAG} ."
+        sh "docker tag ${DOCKER_IMAGE_NAME}:${DOCKER_IMAGE_TAG} ${DOCKER_IMAGE_NAME}:${DOCKER_IMAGE_TAG}"
+        sh "docker login -u ${DOCKER_USERNAME} -p ${DOCKER_PASSWORD} ${DOCKER_REGISTRY_URL}"
+        sh "docker push ${DOCKER_IMAGE_NAME}:${DOCKER_IMAGE_TAG}"		
+    
+      }
+    }
+
+    stage('Docker Run') {
+      steps {              
+                 
+		echo "Docker pushing done"                 
+               
+      }
+    }
+	  stage('Run HELM') {
             steps {
                 script {
-                    // Build Docker image
-                    docker.build(DOCKER_IMAGE_NAME)
-                }
+		  node('test') {
+                    // Set the node where you want to run the Helm commands
+                   
+			sh 'kubectl delete pods --selector=counterapp'
+                         sh 'kubectl delete services --selector=counterapp'                
+                         sh 'helm package /home/ubuntu/counterapp/counterapp-chart'                      
+                        sh 'helm install release-name /home/ubuntu/counterapp/counterapp-chart'
+                    
+					}
+				}
+                
             }
         }
+  }
 
-        stage('Push to Docker Hub') {
-            steps {
-                script {
-                    // Log in to Docker Hub
-                    docker.withRegistry('https://index.docker.io/v1/', DOCKER_HUB_CREDENTIALS) {
-                        // Push Docker image to Docker Hub
-                        docker.image(DOCKER_IMAGE_NAME).push()
-                    }
+  post {
+        success {
+           
+            
+           script {
+                    def publicIp = sh(script: 'curl -s ifconfig.me', returnStdout: true).trim()
+                    echo "Public IP: ${publicIp}"
+                    echo "Application is accessible at http://${publicIp}:9090"
                 }
-            }
         }
 
-        stage('Deploy') {
-            steps {
-                script {
-                    // Run the Docker container with the web application
-                    docker.image(DOCKER_IMAGE_NAME).run('-p 8080:8080')
-                }
-            }
+        failure {
+         
+            echo 'Pipeline failed!'
+           
+        }
+
+        always {
+            
+            echo 'Cleaning up...'
+           
         }
     }
 }
-
-
-In this updated pipeline:
-
-- Environment variables are defined for Docker Hub credentials (DOCKER_HUB_CREDENTIALS) and the Docker image name (DOCKER_IMAGE_NAME). Make sure to replace your-docker-hub-username and your-image-name with your actual Docker Hub username and image name.
-- The pipeline now includes a new stage called "Push to Docker Hub" which logs in to Docker Hub using the provided credentials and pushes the Docker image to Docker Hub.
-- The credentials('docker-hub') function retrieves the Docker Hub credentials from Jenkins credentials store using the provided ID (docker-hub).
-
-Make sure you have configured Docker Hub credentials in Jenkins credentials store with the ID docker-hub (or any other ID you prefer), containing your Docker Hub username and password.
-
-With this updated pipeline, your Docker image will be pushed to Docker Hub as part of your Jenkins pipeline execution.
