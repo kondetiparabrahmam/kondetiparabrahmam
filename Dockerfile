@@ -12,4 +12,4 @@ COPY target/01-maven-web-app.war
 EXPOSE 9090
 
 # Define the command to run your application
-CMD ["java", "-jar", "/app/uber.jar", "&"]
+CMD ["java", "-jar", "/app/01-maven-web-app.war", "&"]
