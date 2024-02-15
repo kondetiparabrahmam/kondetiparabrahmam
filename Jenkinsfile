@@ -15,7 +15,7 @@ pipeline {
         stage('Build') {
             steps {
                 // Checkout source code from Git repository
-                git 'https://github.com/your/repo.git'
+                git 'https://github.com/kondetiparabrahmam/kondetiparabrahmam.git'
                 
                 // Build Maven project
                 sh 'mvn clean package'
