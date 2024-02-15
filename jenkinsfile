@@ -1,0 +1,45 @@
+pipeline {
+    agent any
+
+    environment {
+        DOCKER_REGISTRY_CREDENTIALS = 'docker-hub-credentials'
+        DOCKER_IMAGE = 'your-docker-username/your-docker-image'
+        KUBECONFIG = '/path/to/your/kube/config'
+        K8S_NAMESPACE = 'your-kubernetes-namespace'
+        KUBE_DEPLOYMENT_NAME = 'your-deployment-name'
+    }
+
+    stages {
+        stage('Build') {
+            steps {
+                sh 'mvn clean package'
+            }
+        }
+
+        stage('Dockerize') {
+            steps {
+                script {
+                    docker.build(env.DOCKER_IMAGE)
+                }
+            }
+        }
+
+        stage('Push to Docker Registry') {
+            steps {
+                script {
+                    docker.withRegistry('https://registry.hub.docker.com', env.DOCKER_REGISTRY_CREDENTIALS) {
+                        docker.image(env.DOCKER_IMAGE).push()
+                    }
+                }
+            }
+        }
+
+        stage('Deploy to Kubernetes') {
+            steps {
+                script {
+                    sh 'kubectl apply -f kubernetes/deployment.yaml -n $K8S_NAMESPACE'
+                }
+            }
+        }
+    }
+}
